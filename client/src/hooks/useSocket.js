@@ -17,7 +17,7 @@ export const useSocket = () => {
       return;
     }
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('bugbounty_token') || localStorage.getItem('token');
     if (!token) return;
 
     // Use backend URL or window origin fallback

@@ -24,6 +24,9 @@ build/
 server/uploads/evidence/*
 !server/uploads/evidence/.gitkeep
 
+# Local database runtime files
+server/data/
+
 # Editor & OS files
 .DS_Store
 *.suo

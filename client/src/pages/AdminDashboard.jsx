@@ -1,27 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import * as authService from '../services/authService';
+import * as programService from '../services/programService';
+import * as reportService from '../services/reportService';
 import {
   ShieldAlert,
   Terminal,
-  Users,
+  Building2,
   Activity,
   CheckCircle,
   AlertTriangle,
   Play,
   Lock,
   Cpu,
-  Key,
+  PlusCircle,
+  ArrowRight,
+  ExternalLink,
 } from 'lucide-react';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
+import Spinner from '../components/common/Spinner';
 
 export const AdminDashboard = () => {
   const { user } = useAuth();
   const [adminCheckResult, setAdminCheckResult] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
   const [checkError, setCheckError] = useState(null);
+
+  const [programsCount, setProgramsCount] = useState(0);
+  const [triageReports, setTriageReports] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [progRes, repRes] = await Promise.all([
+          programService.getPrograms(),
+          reportService.getReports({ limit: 5 }),
+        ]);
+
+        if (progRes.success && progRes.data?.programs) {
+          setProgramsCount(progRes.data.programs.length);
+        }
+
+        if (repRes.success && repRes.data?.reports) {
+          setTriageReports(repRes.data.reports);
+        }
+      } catch (err) {
+        console.error('Failed to load admin metrics:', err);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const handleRunAdminCheck = async () => {
     setIsChecking(true);
@@ -40,28 +75,31 @@ export const AdminDashboard = () => {
     }
   };
 
+  const pendingCount = triageReports.filter((r) => ['submitted', 'under_review'].includes(r.status)).length;
+  const criticalCount = triageReports.filter((r) => r.severity === 'critical').length;
+
   const stats = [
     {
-      label: 'Security Researchers',
-      value: '24',
-      desc: 'Active verified hunters',
-      icon: Users,
+      label: 'Configured Programs',
+      value: String(programsCount),
+      desc: 'Active & closed bounties',
+      icon: Building2,
       color: 'text-cyan-400',
       border: 'border-cyan-500/30',
       bg: 'bg-cyan-500/10',
     },
     {
       label: 'Pending Triage Queue',
-      value: '7',
-      desc: 'Awaiting CVSS scoring',
+      value: String(pendingCount),
+      desc: 'Awaiting impact assessment',
       icon: AlertTriangle,
       color: 'text-amber-400',
       border: 'border-amber-500/30',
       bg: 'bg-amber-500/10',
     },
     {
-      label: 'Critical Vulnerabilities',
-      value: '2',
+      label: 'Critical Findings',
+      value: String(criticalCount),
       desc: 'High-priority remediation',
       icon: ShieldAlert,
       color: 'text-red-400',
@@ -93,6 +131,12 @@ export const AdminDashboard = () => {
             &bull; Full administrative governance
           </p>
         </div>
+
+        <Link to="/admin/programs">
+          <Button variant="accent" size="sm" icon={Building2}>
+            Manage Bounty Programs
+          </Button>
+        </Link>
       </div>
 
       {/* Stats Row */}
@@ -180,29 +224,48 @@ export const AdminDashboard = () => {
 
       {/* Triage Queue & Platform Governance Shell */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-3">
+        <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-amber-400" />
-              <span>Triage Queue Shell</span>
+              <span>Incoming Triage Queue</span>
             </h4>
-            <span className="text-xs text-slate-500 font-mono">Phase 2 Scope</span>
+            <span className="text-xs text-cyan-400 font-mono">{triageReports.length} Reports</span>
           </div>
-          <p className="text-xs text-slate-400">
-            Incoming reports from researchers will appear here for severity triage (CVSS 3.1),
-            validation, and reward authorization.
-          </p>
-          <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400">
-            <div className="flex justify-between items-center py-1 border-b border-slate-800">
-              <span className="font-mono text-cyan-400">SEC-2026-001</span>
-              <Badge variant="danger" size="xs">
-                CRITICAL
-              </Badge>
+
+          {isLoadingData ? (
+            <div className="py-6 text-center text-cyan-400">
+              <Spinner size="sm" />
             </div>
-            <p className="text-[11px] text-slate-300 mt-1">
-              Sample Report: Remote Code Execution via Insecure Deserialization
-            </p>
-          </div>
+          ) : triageReports.length === 0 ? (
+            <p className="text-xs text-slate-500 italic py-4">No reports currently in the triage queue.</p>
+          ) : (
+            <div className="space-y-2">
+              {triageReports.slice(0, 4).map((r) => (
+                <div
+                  key={r._id}
+                  className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/30 flex items-center justify-between text-xs transition-colors"
+                >
+                  <div className="overflow-hidden pr-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white truncate max-w-[180px]">{r.title}</span>
+                      <Badge variant={r.severity === 'critical' ? 'danger' : 'warning'} size="xs">
+                        {r.severity}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate max-w-[220px]">
+                      {r.programId?.companyName || 'Program'} &bull; {r.affectedAsset}
+                    </p>
+                  </div>
+                  <Link to={`/reports/${r._id}`}>
+                    <Button variant="ghost" size="sm">
+                      Inspect
+                    </Button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-3">
@@ -215,20 +278,20 @@ export const AdminDashboard = () => {
           </div>
           <ul className="text-xs space-y-2 text-slate-300">
             <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
+              <span>Cloudinary Evidence Uploader</span>
+              <span className="text-emerald-400 font-mono">ACTIVE (Multi-Storage)</span>
+            </li>
+            <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
               <span>Database Sanitization (NoSQL)</span>
               <span className="text-emerald-400 font-mono">ENABLED</span>
             </li>
             <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Auth Rate Limiter (Brute-Force Guard)</span>
+              <span>Auth Rate Limiter</span>
               <span className="text-emerald-400 font-mono">30 REQ / 15 MIN</span>
             </li>
             <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
               <span>Bcrypt Salt Workfactor</span>
               <span className="text-emerald-400 font-mono">12 ROUNDS</span>
-            </li>
-            <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>JWT Expiration</span>
-              <span className="text-emerald-400 font-mono">7 DAYS</span>
             </li>
           </ul>
         </div>

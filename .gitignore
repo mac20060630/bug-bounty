@@ -20,6 +20,10 @@ lerna-debug.log*
 dist/
 build/
 
+# Uploaded evidence
+server/uploads/evidence/*
+!server/uploads/evidence/.gitkeep
+
 # Editor & OS files
 .DS_Store
 *.suo

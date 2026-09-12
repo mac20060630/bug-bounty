@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
+import * as reportService from '../services/reportService';
 import {
   Shield,
   Bug,
@@ -9,13 +11,37 @@ import {
   CheckCircle2,
   FileText,
   ExternalLink,
-  AlertCircle,
+  ArrowRight,
 } from 'lucide-react';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
+import Spinner from '../components/common/Spinner';
 
 export const ResearcherDashboard = () => {
   const { user } = useAuth();
+  const [reports, setReports] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadReports = async () => {
+      try {
+        const res = await reportService.getReports({ limit: 5 });
+        if (res.success && res.data?.reports) {
+          setReports(res.data.reports);
+        }
+      } catch (err) {
+        console.error('Failed to load researcher reports:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadReports();
+  }, []);
+
+  const totalReports = reports.length;
+  const pendingTriage = reports.filter((r) => ['submitted', 'under_review'].includes(r.status)).length;
+  const acceptedReports = reports.filter((r) => ['accepted', 'reward_assigned', 'resolved'].includes(r.status)).length;
 
   const stats = [
     {
@@ -29,17 +55,17 @@ export const ResearcherDashboard = () => {
     },
     {
       label: 'Submitted Reports',
-      value: '0',
-      desc: 'Total reports filed',
+      value: String(totalReports),
+      desc: 'Total findings filed',
       icon: Bug,
       color: 'text-cyan-400',
       border: 'border-cyan-500/30',
       bg: 'bg-cyan-500/10',
     },
     {
-      label: 'Pending Triage',
-      value: '0',
-      desc: 'Under security review',
+      label: 'Pending Review',
+      value: String(pendingTriage),
+      desc: 'Under security triage',
       icon: Clock,
       color: 'text-purple-400',
       border: 'border-purple-500/30',
@@ -47,14 +73,32 @@ export const ResearcherDashboard = () => {
     },
     {
       label: 'Accepted Findings',
-      value: '0',
-      desc: 'Rewarded disclosures',
+      value: String(acceptedReports),
+      desc: 'Validated disclosures',
       icon: CheckCircle2,
       color: 'text-emerald-400',
       border: 'border-emerald-500/30',
       bg: 'bg-emerald-500/10',
     },
   ];
+
+  const getStatusBadge = (status) => {
+    const map = {
+      submitted: 'researcher',
+      under_review: 'purple',
+      triaged: 'warning',
+      accepted: 'admin',
+      reward_assigned: 'admin',
+      rejected: 'danger',
+      resolved: 'admin',
+    };
+    return <Badge variant={map[status] || 'neutral'} size="xs">{status?.replace(/_/g, ' ')}</Badge>;
+  };
+
+  const getSeverityBadge = (sev) => {
+    const map = { low: 'researcher', medium: 'warning', high: 'danger', critical: 'danger' };
+    return <Badge variant={map[sev] || 'neutral'} size="xs">{sev}</Badge>;
+  };
 
   return (
     <div className="space-y-8">
@@ -67,23 +111,21 @@ export const ResearcherDashboard = () => {
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Welcome back, <span className="text-white font-semibold">{user?.name}</span>. Track
-            vulnerabilities and earn reputation for ethical disclosures.
+            vulnerabilities, view active bounties, and earn verified reputation.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="primary"
-            size="md"
-            icon={PlusCircle}
-            onClick={() =>
-              alert(
-                'Phase 1 complete! Vulnerability report submission workflow is arriving in Phase 2.'
-              )
-            }
-          >
-            Submit Vulnerability
-          </Button>
+          <Link to="/programs">
+            <Button variant="secondary" size="md">
+              Browse Programs
+            </Button>
+          </Link>
+          <Link to="/reports/submit">
+            <Button variant="primary" size="md" icon={PlusCircle}>
+              Submit Vulnerability
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -115,31 +157,78 @@ export const ResearcherDashboard = () => {
       <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div>
-            <h3 className="text-base font-bold text-white">Your Vulnerability Disclosures</h3>
+            <h3 className="text-base font-bold text-white">Recent Vulnerability Disclosures</h3>
             <p className="text-xs text-slate-400">
               Live tracking of submitted reports, severity scores, and status
             </p>
           </div>
-          <span className="text-xs text-cyan-400 font-mono">0 Active</span>
+          {reports.length > 0 && (
+            <Link to="/reports" className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1">
+              <span>View All Reports</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </div>
 
-        {/* Empty State */}
-        <div className="py-12 text-center max-w-sm mx-auto space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto">
-            <FileText className="h-6 w-6" />
+        {/* Reports Content */}
+        {isLoading ? (
+          <div className="py-12 text-center text-cyan-400">
+            <Spinner size="md" />
+            <p className="text-xs font-mono text-slate-400 mt-2">Loading Submissions...</p>
           </div>
-          <h4 className="text-sm font-bold text-white">No Vulnerabilities Reported Yet</h4>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            You haven't submitted any vulnerability disclosures. When you find an issue in scope,
-            submit it here for responsible triage and bounty evaluation.
-          </p>
-          <div className="pt-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-[11px] border border-slate-700">
-              <Shield className="h-3 w-3 text-cyan-400" />
-              Reporting workflow unlocks in Phase 2
-            </span>
+        ) : reports.length === 0 ? (
+          <div className="py-12 text-center max-w-sm mx-auto space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto">
+              <FileText className="h-6 w-6" />
+            </div>
+            <h4 className="text-sm font-bold text-white">No Vulnerabilities Reported Yet</h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              You haven't submitted any vulnerability disclosures. Explore active programs in scope and submit your research findings.
+            </p>
+            <div className="pt-2">
+              <Link to="/programs">
+                <Button variant="primary" size="sm" icon={ArrowRight}>
+                  Explore Bounty Programs
+                </Button>
+              </Link>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-slate-400 border-b border-slate-800">
+                <tr>
+                  <th className="py-3 px-3">Title</th>
+                  <th className="py-3 px-3">Program</th>
+                  <th className="py-3 px-3">Severity</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                {reports.slice(0, 5).map((rep) => (
+                  <tr key={rep._id} className="hover:bg-slate-800/30">
+                    <td className="py-3 px-3 font-semibold text-white truncate max-w-[200px]">
+                      {rep.title}
+                    </td>
+                    <td className="py-3 px-3 text-slate-400 truncate max-w-[150px]">
+                      {rep.programId?.companyName}
+                    </td>
+                    <td className="py-3 px-3">{getSeverityBadge(rep.severity)}</td>
+                    <td className="py-3 px-3">{getStatusBadge(rep.status)}</td>
+                    <td className="py-3 px-3 text-right">
+                      <Link to={`/reports/${rep._id}`}>
+                        <Button variant="ghost" size="sm">
+                          Inspect
+                        </Button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Responsible Disclosure Quick Reference */}
@@ -154,10 +243,10 @@ export const ResearcherDashboard = () => {
             security teams at least 90 days before coordinated disclosure.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-cyan-400 font-semibold cursor-pointer hover:underline text-[11px]">
-          <span>Security Guidelines</span>
+        <Link to="/programs" className="flex items-center gap-1.5 text-cyan-400 font-semibold hover:underline text-[11px]">
+          <span>View Scope Targets</span>
           <ExternalLink className="h-3.5 w-3.5" />
-        </div>
+        </Link>
       </div>
     </div>
   );

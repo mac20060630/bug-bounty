@@ -17,6 +17,12 @@ import ResearcherDashboard from '../pages/ResearcherDashboard';
 import AdminDashboard from '../pages/AdminDashboard';
 import ProfilePage from '../pages/ProfilePage';
 import NotFoundPage from '../pages/NotFoundPage';
+import ProgramsPage from '../pages/ProgramsPage';
+import ProgramDetailsPage from '../pages/ProgramDetailsPage';
+import SubmitReportPage from '../pages/SubmitReportPage';
+import MyReportsPage from '../pages/MyReportsPage';
+import ReportDetailsPage from '../pages/ReportDetailsPage';
+import AdminProgramsPage from '../pages/AdminProgramsPage';
 
 // Public Route Guard: If authenticated, redirect away from login/register
 const PublicOnlyRoute = ({ children }) => {
@@ -33,6 +39,8 @@ export const AppRoutes = () => {
       {/* Public Pages with Main Layout */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/programs" element={<ProgramsPage />} />
+        <Route path="/programs/:id" element={<ProgramDetailsPage />} />
         <Route
           path="/login"
           element={
@@ -61,11 +69,22 @@ export const AppRoutes = () => {
         }
       >
         <Route path="/researcher/dashboard" element={<ResearcherDashboard />} />
+        <Route path="/reports" element={<MyReportsPage />} />
+        <Route path="/reports/submit" element={<SubmitReportPage />} />
+        <Route path="/reports/:id" element={<ReportDetailsPage />} />
         <Route
           path="/admin/dashboard"
           element={
             <ProtectedRoute requiredRole="admin">
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/programs"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminProgramsPage />
             </ProtectedRoute>
           }
         />

@@ -55,17 +55,43 @@ export const Navbar = () => {
                   Dashboard
                 </Link>
 
+                <Link
+                  to="/programs"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    location.pathname.startsWith('/programs')
+                      ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Shield className="h-3.5 w-3.5" />
+                  Programs
+                </Link>
+
+                {!isAdmin && (
+                  <Link
+                    to="/reports"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                      location.pathname.startsWith('/reports')
+                        ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <Bug className="h-3.5 w-3.5" />
+                    My Reports
+                  </Link>
+                )}
+
                 {isAdmin && (
                   <Link
-                    to="/admin/dashboard"
+                    to="/admin/programs"
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                      isActive('/admin/dashboard')
+                      isActive('/admin/programs')
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                         : 'text-slate-300 hover:text-emerald-400 hover:bg-emerald-950/30'
                     }`}
                   >
                     <Terminal className="h-3.5 w-3.5" />
-                    Admin Command
+                    Manage Programs
                   </Link>
                 )}
 

@@ -56,3 +56,24 @@ export const requireRole = (...allowedRoles) => {
     next();
   };
 };
+
+export const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = verifyToken(token);
+        const user = await User.findById(decoded.id);
+        if (user && user.isActive) {
+          req.user = user;
+        }
+      } catch (err) {
+        // Silently ignore token errors for optional auth
+      }
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+};

@@ -1,5 +1,8 @@
 import VulnerabilityReport from '../models/VulnerabilityReport.js';
 import BountyProgram from '../models/BountyProgram.js';
+import { calculateRiskScore } from './riskScoringService.js';
+import { checkReportDuplicates } from './duplicateDetectionService.js';
+import { notifyAdmins } from './notificationService.js';
 
 export const createReport = async (reportData, researcherId) => {
   // Validate that the target program exists and is active
@@ -18,20 +21,35 @@ export const createReport = async (reportData, researcherId) => {
     throw error;
   }
 
-  // Calculate base CVSS risk score mapping based on untrusted researcher input
-  const severityScoreMap = {
-    low: 3.5,
-    medium: 5.5,
-    high: 7.5,
-    critical: 9.5,
-  };
+  // Calculate deterministic risk score assessment
+  const riskAssessment = calculateRiskScore({
+    impact: reportData.impactRating || reportData.severity || 'medium',
+    exploitability: reportData.exploitability || 'poc',
+    attackVector: reportData.attackVector || 'network',
+    dataExposure: reportData.dataExposure || 'none',
+    authRequirements: reportData.authRequirements || 'none_unauthenticated',
+  });
 
-  const riskScore = severityScoreMap[reportData.severity] || 5.0;
+  const riskScore = riskAssessment.score;
+
+  // Run duplicate & similarity check against existing reports
+  const duplicateCheck = await checkReportDuplicates({
+    ...reportData,
+    programId: reportData.programId,
+  });
 
   const report = new VulnerabilityReport({
     ...reportData,
     researcherId,
     riskScore,
+    originalSeverity: reportData.severity || riskAssessment.severityRecommendation,
+    riskAssessment,
+    duplicateCheck: {
+      highestSimilarity: duplicateCheck.highestSimilarity,
+      recommendation: duplicateCheck.recommendation,
+      checkedAt: new Date(),
+      matches: duplicateCheck.matches,
+    },
     status: 'submitted',
     statusHistory: [
       {
@@ -41,9 +59,48 @@ export const createReport = async (reportData, researcherId) => {
         timestamp: new Date(),
       },
     ],
+    timelineEvents: [
+      {
+        type: 'report_created',
+        actor: researcherId,
+        message: `Report created with risk score ${riskScore} (${riskAssessment.riskBand})`,
+        metadata: {
+          riskScore,
+          similarityScore: duplicateCheck.highestSimilarity,
+        },
+        timestamp: new Date(),
+      },
+    ],
   });
 
   await report.save();
+
+  // Notify administrators of new submission
+  try {
+    await notifyAdmins({
+      type: 'report_submitted',
+      message: `New finding submitted: "${report.title}" on ${program.companyName}`,
+      data: {
+        reportId: report._id,
+        programId: program._id,
+        severity: report.severity,
+      },
+    });
+
+    if (duplicateCheck.highestSimilarity >= 45) {
+      await notifyAdmins({
+        type: 'duplicate_detected',
+        message: `Potential duplicate (${duplicateCheck.highestSimilarity}% similarity) detected on report "${report.title}"`,
+        data: {
+          reportId: report._id,
+          similarityScore: duplicateCheck.highestSimilarity,
+        },
+      });
+    }
+  } catch (notifyErr) {
+    console.error('[Notification] Failed to notify admins on report submission:', notifyErr.message);
+  }
+
   return report.populate([
     { path: 'researcherId', select: 'name email reputation' },
     { path: 'programId', select: 'companyName title rewardRange' },

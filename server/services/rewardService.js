@@ -1,6 +1,7 @@
 import Reward from '../models/Reward.js';
 import VulnerabilityReport from '../models/VulnerabilityReport.js';
 import BountyProgram from '../models/BountyProgram.js';
+import { createNotification } from './notificationService.js';
 
 export const assignReward = async ({ reportId, amount, currency = 'USD', notes = '' }, adminUser) => {
   const report = await VulnerabilityReport.findById(reportId).populate('programId');
@@ -80,6 +81,25 @@ export const assignReward = async ({ reportId, amount, currency = 'USD', notes =
   });
 
   await report.save();
+
+  // Notify researcher of assigned bounty
+  try {
+    const researcherId = report.researcherId?._id || report.researcherId;
+    if (researcherId) {
+      await createNotification({
+        userId: researcherId,
+        type: 'bounty_assigned',
+        message: `Bounty reward of $${numAmount.toLocaleString()} ${currency} awarded for report "${report.title}"!`,
+        data: {
+          reportId: report._id,
+          amount: numAmount,
+          currency,
+        },
+      });
+    }
+  } catch (notifyErr) {
+    console.error('[Notification] Failed to send bounty notification:', notifyErr.message);
+  }
 
   return { reward, report };
 };

@@ -1,5 +1,6 @@
 import VulnerabilityReport from '../models/VulnerabilityReport.js';
 import { awardReputationForReport } from './reputationService.js';
+import { createNotification } from './notificationService.js';
 
 // Centralized state transition graph
 export const VALID_TRANSITIONS = {
@@ -92,6 +93,35 @@ export const transitionReportStatus = async (reportId, targetStatus, note = '', 
   }
 
   await report.save();
+
+  // Notify researcher of status transition
+  try {
+    const notifyTypeMap = {
+      under_review: 'report_reviewed',
+      accepted: 'report_accepted',
+      rejected: 'report_rejected',
+      resolved: 'report_resolved',
+    };
+
+    const nType = notifyTypeMap[targetStatus] || 'status_changed';
+    const researcherId = report.researcherId?._id || report.researcherId;
+
+    if (researcherId) {
+      await createNotification({
+        userId: researcherId,
+        type: nType,
+        message: `Your report "${report.title}" has been updated to "${targetStatus.replace(/_/g, ' ')}".`,
+        data: {
+          reportId: report._id,
+          status: targetStatus,
+          note,
+        },
+      });
+    }
+  } catch (notifyErr) {
+    console.error('[Notification] Failed to send status change notification:', notifyErr.message);
+  }
+
   return report;
 };
 
@@ -133,5 +163,24 @@ export const updateReportSeverity = async (reportId, newSeverity, adminUser) => 
   });
 
   await report.save();
+
+  // Notify researcher of severity adjustment
+  try {
+    if (report.researcherId) {
+      await createNotification({
+        userId: report.researcherId,
+        type: 'severity_changed',
+        message: `Severity on your report "${report.title}" was adjusted to ${formatted.toUpperCase()}.`,
+        data: {
+          reportId: report._id,
+          oldSeverity,
+          newSeverity: formatted,
+        },
+      });
+    }
+  } catch (notifyErr) {
+    console.error('[Notification] Failed to send severity change notification:', notifyErr.message);
+  }
+
   return report;
 };

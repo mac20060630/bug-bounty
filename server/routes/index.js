@@ -6,6 +6,8 @@ import uploadRoutes from './uploadRoutes.js';
 import rewardRoutes from './rewardRoutes.js';
 import leaderboardRoutes from './leaderboardRoutes.js';
 import statsRoutes from './statsRoutes.js';
+import notificationRoutes from './notificationRoutes.js';
+import analyticsRoutes from './analyticsRoutes.js';
 import { sendSuccess } from '../utils/response.js';
 
 const router = express.Router();
@@ -28,5 +30,7 @@ router.use('/upload', uploadRoutes);
 router.use('/rewards', rewardRoutes);
 router.use('/leaderboard', leaderboardRoutes);
 router.use('/stats', statsRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/analytics', analyticsRoutes);
 
 export default router;

@@ -1,8 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import http from 'http';
 import app from './app.js';
 import { connectDB, disconnectDB } from './config/db.js';
+import { initSocket } from './services/socketService.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -13,10 +15,17 @@ const startServer = async () => {
     // Connect to database
     await connectDB();
 
-    // Start HTTP server
-    server = app.listen(PORT, () => {
+    // Create HTTP server
+    server = http.createServer(app);
+
+    // Initialize Socket.IO
+    initSocket(server);
+
+    // Start HTTP server listening
+    server.listen(PORT, () => {
       console.log(`=========================================`);
       console.log(`[BugBounty API] Server running on port ${PORT}`);
+      console.log(`[BugBounty API] WebSocket real-time engine active`);
       console.log(`[BugBounty API] Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`[BugBounty API] Health check: http://localhost:${PORT}/api/health`);
       console.log(`=========================================`);

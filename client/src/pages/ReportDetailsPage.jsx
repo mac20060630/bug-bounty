@@ -31,6 +31,8 @@ import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 import StatusTimeline from '../components/common/StatusTimeline';
+import RiskScoreInspector from '../components/common/RiskScoreInspector';
+import DuplicateInspector from '../components/common/DuplicateInspector';
 
 export const ReportDetailsPage = () => {
   const { id } = useParams();
@@ -364,6 +366,14 @@ export const ReportDetailsPage = () => {
           <StatusTimeline currentStatus={report.status} statusHistory={report.statusHistory} />
         </div>
       </div>
+
+      {/* Intelligent Screening & Risk Engine Insights */}
+      <DuplicateInspector duplicateCheck={report.duplicateCheck} />
+      <RiskScoreInspector
+        riskAssessment={report.riskAssessment}
+        severity={report.severity}
+        riskScore={report.riskScore}
+      />
 
       {/* Admin Triage & Actions Operations Dock (Admin Only) */}
       {isAdmin && (

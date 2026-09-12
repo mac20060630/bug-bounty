@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Shield, Bug, LogOut, User as UserIcon, LayoutDashboard, Terminal, Trophy, ShieldAlert } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import Badge from './common/Badge';
+import NotificationCenter from './common/NotificationCenter';
 
 export const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
@@ -136,6 +137,8 @@ export const Navbar = () => {
 
               {/* User profile snippet */}
               <div className="flex items-center gap-3 pl-3 border-l border-slate-800">
+                <NotificationCenter />
+
                 <Link to="/profile" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
                   <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-cyan-400">
                     {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}

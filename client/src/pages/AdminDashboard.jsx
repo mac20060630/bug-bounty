@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 import useAuth from '../hooks/useAuth';
 import * as authService from '../services/authService';
 import * as statsService from '../services/statsService';
+import * as analyticsService from '../services/analyticsService';
 import * as reportService from '../services/reportService';
 import {
   ShieldAlert,
@@ -14,19 +28,45 @@ import {
   Play,
   Lock,
   Cpu,
-  PlusCircle,
   ArrowRight,
-  ExternalLink,
   DollarSign,
   Award,
-  Users,
   CheckCircle2,
   Sliders,
+  TrendingUp,
+  Clock,
+  PieChart as PieIcon,
+  BarChart3,
 } from 'lucide-react';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 import Spinner from '../components/common/Spinner';
+
+const SEVERITY_COLORS = {
+  critical: '#ef4444',
+  high: '#f97316',
+  medium: '#eab308',
+  low: '#06b6d4',
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs shadow-2xl space-y-1 font-mono">
+        <p className="text-slate-400 font-semibold">{label}</p>
+        {payload.map((entry, index) => (
+          <div key={`item-${index}`} className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-slate-300 capitalize">{entry.name}:</span>
+            <span className="font-bold text-white">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 export const AdminDashboard = () => {
   const { user } = useAuth();
@@ -35,32 +75,36 @@ export const AdminDashboard = () => {
   const [checkError, setCheckError] = useState(null);
 
   const [stats, setStats] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [recentReports, setRecentReports] = useState([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const [statsRes, repRes] = await Promise.all([
+        const [statsRes, analyticsRes, repRes] = await Promise.all([
           statsService.getAdminStats(),
+          analyticsService.getAdminAnalytics(),
           reportService.getReports({ limit: 5, sort: '-createdAt' }),
         ]);
 
         if (statsRes.success && statsRes.data?.stats) {
           setStats(statsRes.data.stats);
         }
-
+        if (analyticsRes.success && analyticsRes.data?.analytics) {
+          setAnalytics(analyticsRes.data.analytics);
+        }
         if (repRes.success && repRes.data?.reports) {
           setRecentReports(repRes.data.reports);
         }
       } catch (err) {
-        console.error('Failed to load real admin metrics:', err);
+        console.error('Failed to load admin analytics & telemetry:', err);
       } finally {
         setIsLoadingData(false);
       }
     };
 
-    fetchStats();
+    fetchDashboardData();
   }, []);
 
   const handleRunAdminCheck = async () => {
@@ -107,17 +151,36 @@ export const AdminDashboard = () => {
       color: 'text-red-400',
       border: 'border-red-500/30',
       bg: 'bg-red-500/10',
+      pulse: (stats?.criticalReports ?? 0) > 0,
     },
     {
       label: 'Total Bounty Distributed',
       value: `$${(stats?.totalRewards ?? 0).toLocaleString()}`,
-      desc: `Paid out to verified researchers`,
+      desc: 'Paid out to verified researchers',
       icon: DollarSign,
       color: 'text-emerald-400',
       border: 'border-emerald-500/30',
       bg: 'bg-emerald-500/10',
     },
   ];
+
+  // Prepare chart data
+  const reportsOverTimeData = analytics?.reportsOverTime?.length
+    ? analytics.reportsOverTime
+    : [
+        { date: 'Initial', count: 0, criticalCount: 0, acceptedCount: 0 },
+      ];
+
+  const severityPieData = analytics?.severityDist?.length
+    ? analytics.severityDist.map((item) => ({
+        name: item.severity,
+        value: item.count,
+        color: SEVERITY_COLORS[item.severity] || '#94a3b8',
+      }))
+    : [
+        { name: 'Low', value: 1, color: '#06b6d4' },
+        { name: 'Medium', value: 1, color: '#eab308' },
+      ];
 
   return (
     <div className="space-y-8">
@@ -130,7 +193,7 @@ export const AdminDashboard = () => {
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Logged in as <span className="text-white font-semibold">{user?.name}</span> ({user?.email})
-            &bull; Real-time MongoDB metrics & platform telemetry
+            &bull; Live MongoDB aggregations & Socket.IO real-time telemetry
           </p>
         </div>
 
@@ -153,15 +216,21 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
           return (
             <div
               key={idx}
-              className={`glass-panel p-5 rounded-2xl border ${stat.border} transition-all hover:translate-y-[-2px]`}
+              className={`glass-panel p-5 rounded-2xl border ${stat.border} transition-all hover:translate-y-[-2px] relative overflow-hidden`}
             >
+              {stat.pulse && (
+                <div className="absolute top-2 right-2 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                </div>
+              )}
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   {stat.label}
@@ -177,46 +246,196 @@ export const AdminDashboard = () => {
         })}
       </div>
 
-      {/* Triage & Resolution Statistics Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-slate-400 block">Pending Review</span>
-            <span className="text-xl font-bold font-mono text-amber-400">
-              {stats?.pendingReviews ?? 0}
+      {/* Analytics Charts Grid (Recharts) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Reports & Submissions Velocity Over Time (2 cols) */}
+        <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-white">
+                Vulnerability Submissions Velocity & Trends
+              </h3>
+            </div>
+            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-500/30 px-2 py-0.5 rounded">
+              REAL DATABASE TELEMETRY
             </span>
           </div>
-          <AlertTriangle className="h-5 w-5 text-amber-500/50" />
+
+          <div className="h-64 w-full pt-2">
+            {isLoadingData ? (
+              <div className="h-full flex items-center justify-center text-cyan-400">
+                <Spinner size="md" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={reportsOverTimeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="totalColor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="critColor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    name="Total Submissions"
+                    stroke="#06b6d4"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#totalColor)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="criticalCount"
+                    name="Critical Findings"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#critColor)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-slate-400 block">Triaged Findings</span>
-            <span className="text-xl font-bold font-mono text-purple-400">
-              {stats?.triagedReports ?? 0}
-            </span>
+        {/* Severity Distribution Donut Chart (1 col) */}
+        <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <PieIcon className="h-4 w-4 text-amber-400" />
+              <h3 className="text-sm font-bold text-white">Severity Breakdown</h3>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">CVSS v3.1</span>
           </div>
-          <Sliders className="h-5 w-5 text-purple-500/50" />
+
+          <div className="h-52 w-full flex items-center justify-center">
+            {isLoadingData ? (
+              <Spinner size="md" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={severityPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={75}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {severityPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-slate-800">
+            {severityPieData.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-1.5 font-mono">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="text-slate-300 capitalize">{item.name}:</span>
+                <span className="font-bold text-white ml-auto">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Resolution Statistics & Program Performance Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Resolution Statistics */}
+        <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-emerald-400" />
+              <h4 className="text-sm font-bold text-white">Resolution & Remediation Telemetry</h4>
+            </div>
+            <Badge variant="admin" size="xs">
+              {stats?.resolutionRate ?? 0}% Remediation
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span className="text-[10px] text-slate-400 block font-mono uppercase">Mean Resolution Time</span>
+              <span className="text-lg font-bold font-mono text-cyan-400">
+                {analytics?.resolution?.avgResolutionHours ?? 0} hrs
+              </span>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span className="text-[10px] text-slate-400 block font-mono uppercase">Total Resolved</span>
+              <span className="text-lg font-bold font-mono text-emerald-400">
+                {stats?.resolvedReports ?? 0}
+              </span>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span className="text-[10px] text-slate-400 block font-mono uppercase">Pending Triage</span>
+              <span className="text-lg font-bold font-mono text-amber-400">
+                {stats?.pendingReviews ?? 0}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Mean resolution time is dynamically derived from report creation to resolution lifecycle completion across all programs.
+          </p>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-slate-400 block">Accepted & Rewarded</span>
-            <span className="text-xl font-bold font-mono text-cyan-400">
-              {stats?.acceptedReports ?? 0}
-            </span>
+        {/* Top Programs Performance */}
+        <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-purple-400" />
+              <h4 className="text-sm font-bold text-white">Top Active Programs Scope</h4>
+            </div>
+            <Link to="/admin/programs" className="text-xs text-cyan-400 hover:underline font-mono">
+              Manage &rarr;
+            </Link>
           </div>
-          <Award className="h-5 w-5 text-cyan-500/50" />
-        </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-slate-400 block">Resolution Rate</span>
-            <span className="text-xl font-bold font-mono text-emerald-400">
-              {stats?.resolutionRate ?? 0}% ({stats?.resolvedReports ?? 0} closed)
-            </span>
-          </div>
-          <CheckCircle2 className="h-5 w-5 text-emerald-500/50" />
+          {analytics?.topPrograms?.length === 0 ? (
+            <p className="text-xs text-slate-500 italic py-4">No program submission telemetry yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {analytics?.topPrograms?.map((prog, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-slate-900/40 border border-slate-800 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="font-bold text-white">{prog.companyName}</span>
+                    <span className="text-[10px] text-slate-400 block font-mono truncate max-w-[200px]">
+                      {prog.title}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-cyan-400">
+                      <strong>{prog.reportCount}</strong> reports
+                    </span>
+                    {prog.criticalCount > 0 && (
+                      <Badge variant="danger" size="xs">
+                        {prog.criticalCount} crit
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -269,81 +488,47 @@ export const AdminDashboard = () => {
         )}
       </div>
 
-      {/* Triage Queue & Platform Governance Shell */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-amber-400" />
-              <span>Incoming Triage Submissions</span>
-            </h4>
-            <Link to="/admin/reports" className="text-xs text-cyan-400 hover:underline font-mono">
-              View All Queue &rarr;
-            </Link>
+      {/* Recent Submissions Triage Quick Access */}
+      <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-amber-400" />
+            <h4 className="text-sm font-bold text-white">Incoming Submissions Queue</h4>
           </div>
+          <Link to="/admin/reports" className="text-xs text-cyan-400 hover:underline font-mono">
+            Full Triage Console &rarr;
+          </Link>
+        </div>
 
-          {isLoadingData ? (
-            <div className="py-6 text-center text-cyan-400">
-              <Spinner size="sm" />
-            </div>
-          ) : recentReports.length === 0 ? (
-            <p className="text-xs text-slate-500 italic py-4">No reports currently in the triage queue.</p>
-          ) : (
-            <div className="space-y-2">
-              {recentReports.map((r) => (
-                <div
-                  key={r._id}
-                  className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/30 flex items-center justify-between text-xs transition-colors"
-                >
-                  <div className="overflow-hidden pr-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white truncate max-w-[180px]">{r.title}</span>
-                      <Badge variant={r.severity === 'critical' ? 'danger' : 'warning'} size="xs">
-                        {r.severity}
-                      </Badge>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate max-w-[220px]">
-                      {r.programId?.companyName || 'Program'} &bull; {r.affectedAsset}
-                    </p>
+        {recentReports.length === 0 ? (
+          <p className="text-xs text-slate-500 italic py-4">No reports currently in the queue.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {recentReports.map((r) => (
+              <div
+                key={r._id}
+                className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/30 flex items-center justify-between text-xs transition-colors"
+              >
+                <div className="overflow-hidden pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white truncate max-w-[180px]">{r.title}</span>
+                    <Badge variant={r.severity === 'critical' ? 'danger' : 'warning'} size="xs">
+                      {r.severity}
+                    </Badge>
                   </div>
-                  <Link to={`/reports/${r._id}`}>
-                    <Button variant="ghost" size="sm">
-                      Triage
-                    </Button>
-                  </Link>
+                  <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate max-w-[220px]">
+                    {r.programId?.companyName || 'Program'} &bull; {r.affectedAsset}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <Cpu className="h-4 w-4 text-cyan-400" />
-              <span>Platform Security Health & Services</span>
-            </h4>
-            <span className="text-xs text-emerald-400 font-mono">ALL SYSTEMS OPERATIONAL</span>
+                <Link to={`/reports/${r._id}`}>
+                  <Button variant="ghost" size="sm">
+                    Triage
+                  </Button>
+                </Link>
+              </div>
+            ))}
           </div>
-          <ul className="text-xs space-y-2 text-slate-300">
-            <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Reputation Engine</span>
-              <span className="text-cyan-400 font-mono">AUTOMATED (+100/50/25/10 PTS)</span>
-            </li>
-            <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Vulnerability State Machine</span>
-              <span className="text-emerald-400 font-mono">ENFORCED (Strict 7-step)</span>
-            </li>
-            <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Internal Admin Notes</span>
-              <span className="text-amber-400 font-mono">PRIVACY SECURED</span>
-            </li>
-            <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Researcher Community</span>
-              <span className="text-purple-400 font-mono">{stats?.totalResearchers ?? 0} ACTIVE</span>
-            </li>
-          </ul>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 import useAuth from '../hooks/useAuth';
 import * as statsService from '../services/statsService';
+import * as analyticsService from '../services/analyticsService';
 import {
   Shield,
   Bug,
@@ -9,38 +22,70 @@ import {
   PlusCircle,
   Clock,
   CheckCircle2,
-  XCircle,
   FileText,
-  ExternalLink,
   ArrowRight,
   DollarSign,
   TrendingUp,
-  Activity,
+  Percent,
+  PieChart as PieIcon,
 } from 'lucide-react';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
 
+const SEVERITY_COLORS = {
+  critical: '#ef4444',
+  high: '#f97316',
+  medium: '#eab308',
+  low: '#06b6d4',
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs shadow-2xl space-y-1 font-mono">
+        <p className="text-slate-400 font-semibold">{label}</p>
+        {payload.map((entry, index) => (
+          <div key={`item-${index}`} className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-slate-300 capitalize">{entry.name}:</span>
+            <span className="font-bold text-white">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export const ResearcherDashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadResearcherStats = async () => {
+    const loadDashboardData = async () => {
       try {
-        const res = await statsService.getResearcherStats();
-        if (res.success && res.data?.stats) {
-          setStats(res.data.stats);
+        const [statsRes, analyticsRes] = await Promise.all([
+          statsService.getResearcherStats(),
+          analyticsService.getResearcherAnalytics(),
+        ]);
+
+        if (statsRes.success && statsRes.data?.stats) {
+          setStats(statsRes.data.stats);
+        }
+        if (analyticsRes.success && analyticsRes.data?.analytics) {
+          setAnalytics(analyticsRes.data.analytics);
         }
       } catch (err) {
-        console.error('Failed to load researcher stats:', err);
+        console.error('Failed to load researcher dashboard telemetry:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadResearcherStats();
+    loadDashboardData();
   }, []);
 
   const statCards = [
@@ -63,10 +108,10 @@ export const ResearcherDashboard = () => {
       bg: 'bg-emerald-500/10',
     },
     {
-      label: 'Accepted Findings',
-      value: String(stats?.acceptedReports ?? 0),
-      desc: `${stats?.totalReports ?? 0} total submissions filed`,
-      icon: CheckCircle2,
+      label: 'Acceptance Rate',
+      value: `${analytics?.acceptanceRate ?? 0}%`,
+      desc: `${stats?.acceptedReports ?? 0} accepted / ${stats?.rejectedReports ?? 0} rejected`,
+      icon: Percent,
       color: 'text-cyan-400',
       border: 'border-cyan-500/30',
       bg: 'bg-cyan-500/10',
@@ -74,7 +119,7 @@ export const ResearcherDashboard = () => {
     {
       label: 'Pending Triage',
       value: String(stats?.pendingReports ?? 0),
-      desc: `${stats?.rejectedReports ?? 0} rejected findings`,
+      desc: `${stats?.totalReports ?? 0} total findings filed`,
       icon: Clock,
       color: 'text-purple-400',
       border: 'border-purple-500/30',
@@ -100,6 +145,22 @@ export const ResearcherDashboard = () => {
     return <Badge variant={map[sev] || 'neutral'} size="xs">{sev}</Badge>;
   };
 
+  const reputationChartData = analytics?.reputationHistory?.length
+    ? analytics.reputationHistory
+    : [
+        { date: 'Initial', totalReputation: user?.reputation || 0 },
+      ];
+
+  const severityPieData = analytics?.severityDist?.length
+    ? analytics.severityDist.map((item) => ({
+        name: item.severity,
+        value: item.count,
+        color: SEVERITY_COLORS[item.severity] || '#94a3b8',
+      }))
+    : [
+        { name: 'None', value: 1, color: '#334155' },
+      ];
+
   return (
     <div className="space-y-8">
       {/* Header Banner */}
@@ -110,8 +171,8 @@ export const ResearcherDashboard = () => {
             <Badge variant="researcher">Verified Researcher</Badge>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Welcome back, <span className="text-white font-semibold">{user?.name}</span>. Track your
-            submissions, monitor bounty payouts, and review your audit reputation activity.
+            Welcome back, <span className="text-white font-semibold">{user?.name}</span>. Real-time
+            vulnerability tracking, reputation progression, and payout telemetry.
           </p>
         </div>
 
@@ -129,7 +190,7 @@ export const ResearcherDashboard = () => {
         </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
@@ -151,6 +212,102 @@ export const ResearcherDashboard = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Analytics Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Reputation Progression Chart (2 cols) */}
+        <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-white">
+                Reputation Points Accumulation History
+              </h3>
+            </div>
+            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-500/30 px-2 py-0.5 rounded">
+              VERIFIED ENGINE
+            </span>
+          </div>
+
+          <div className="h-60 w-full pt-2">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center text-cyan-400">
+                <Spinner size="md" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={reputationChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="repColor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="totalReputation"
+                    name="Reputation Score"
+                    stroke="#38bdf8"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#repColor)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Personal Findings Severity Breakdown (1 col) */}
+        <div className="glass-panel p-6 rounded-2xl border border-cyber-border/80 space-y-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <PieIcon className="h-4 w-4 text-amber-400" />
+              <h3 className="text-sm font-bold text-white">Disclosed Severity Spread</h3>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">Personal Findings</span>
+          </div>
+
+          <div className="h-48 w-full flex items-center justify-center">
+            {isLoading ? (
+              <Spinner size="md" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={severityPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={65}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {severityPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-slate-800">
+            {severityPieData.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-1.5 font-mono">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="text-slate-300 capitalize">{item.name}:</span>
+                <span className="font-bold text-white ml-auto">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Main Submissions & Activity Grid */}

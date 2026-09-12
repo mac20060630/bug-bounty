@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import * as authService from '../services/authService';
-import * as programService from '../services/programService';
+import * as statsService from '../services/statsService';
 import * as reportService from '../services/reportService';
 import {
   ShieldAlert,
@@ -17,6 +17,11 @@ import {
   PlusCircle,
   ArrowRight,
   ExternalLink,
+  DollarSign,
+  Award,
+  Users,
+  CheckCircle2,
+  Sliders,
 } from 'lucide-react';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
@@ -29,27 +34,27 @@ export const AdminDashboard = () => {
   const [isChecking, setIsChecking] = useState(false);
   const [checkError, setCheckError] = useState(null);
 
-  const [programsCount, setProgramsCount] = useState(0);
-  const [triageReports, setTriageReports] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [recentReports, setRecentReports] = useState([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [progRes, repRes] = await Promise.all([
-          programService.getPrograms(),
-          reportService.getReports({ limit: 5 }),
+        const [statsRes, repRes] = await Promise.all([
+          statsService.getAdminStats(),
+          reportService.getReports({ limit: 5, sort: '-createdAt' }),
         ]);
 
-        if (progRes.success && progRes.data?.programs) {
-          setProgramsCount(progRes.data.programs.length);
+        if (statsRes.success && statsRes.data?.stats) {
+          setStats(statsRes.data.stats);
         }
 
         if (repRes.success && repRes.data?.reports) {
-          setTriageReports(repRes.data.reports);
+          setRecentReports(repRes.data.reports);
         }
       } catch (err) {
-        console.error('Failed to load admin metrics:', err);
+        console.error('Failed to load real admin metrics:', err);
       } finally {
         setIsLoadingData(false);
       }
@@ -75,42 +80,39 @@ export const AdminDashboard = () => {
     }
   };
 
-  const pendingCount = triageReports.filter((r) => ['submitted', 'under_review'].includes(r.status)).length;
-  const criticalCount = triageReports.filter((r) => r.severity === 'critical').length;
-
-  const stats = [
+  const statCards = [
     {
       label: 'Configured Programs',
-      value: String(programsCount),
-      desc: 'Active & closed bounties',
+      value: String(stats?.totalPrograms ?? 0),
+      desc: `${stats?.activePrograms ?? 0} active bounty scopes`,
       icon: Building2,
       color: 'text-cyan-400',
       border: 'border-cyan-500/30',
       bg: 'bg-cyan-500/10',
     },
     {
-      label: 'Pending Triage Queue',
-      value: String(pendingCount),
-      desc: 'Awaiting impact assessment',
+      label: 'Total Submissions',
+      value: String(stats?.totalReports ?? 0),
+      desc: `${stats?.pendingReviews ?? 0} pending initial triage`,
       icon: AlertTriangle,
       color: 'text-amber-400',
       border: 'border-amber-500/30',
       bg: 'bg-amber-500/10',
     },
     {
-      label: 'Critical Findings',
-      value: String(criticalCount),
-      desc: 'High-priority remediation',
+      label: 'Critical Vulnerabilities',
+      value: String(stats?.criticalReports ?? 0),
+      desc: 'Urgent remediation targets',
       icon: ShieldAlert,
       color: 'text-red-400',
       border: 'border-red-500/30',
       bg: 'bg-red-500/10',
     },
     {
-      label: 'Platform Auth Status',
-      value: '100% OK',
-      desc: 'Bcrypt + JWT active',
-      icon: Activity,
+      label: 'Total Bounty Distributed',
+      value: `$${(stats?.totalRewards ?? 0).toLocaleString()}`,
+      desc: `Paid out to verified researchers`,
+      icon: DollarSign,
       color: 'text-emerald-400',
       border: 'border-emerald-500/30',
       bg: 'bg-emerald-500/10',
@@ -123,25 +125,37 @@ export const AdminDashboard = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-white tracking-tight">Admin Operations Console</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Admin Operations Command</h1>
             <Badge variant="admin">System Administrator</Badge>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Logged in as <span className="text-white font-semibold">{user?.name}</span> ({user?.email})
-            &bull; Full administrative governance
+            &bull; Real-time MongoDB metrics & platform telemetry
           </p>
         </div>
 
-        <Link to="/admin/programs">
-          <Button variant="accent" size="sm" icon={Building2}>
-            Manage Bounty Programs
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/admin/reports">
+            <Button variant="accent" size="sm" icon={Sliders}>
+              Triage Reports Queue
+            </Button>
+          </Link>
+          <Link to="/admin/programs">
+            <Button variant="secondary" size="sm" icon={Building2}>
+              Manage Programs
+            </Button>
+          </Link>
+          <Link to="/leaderboard">
+            <Button variant="ghost" size="sm" icon={Award}>
+              Leaderboard
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Stats Row */}
+      {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, idx) => {
+        {statCards.map((stat, idx) => {
           const Icon = stat.icon;
           return (
             <div
@@ -161,6 +175,49 @@ export const AdminDashboard = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Triage & Resolution Statistics Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+          <div>
+            <span className="text-xs text-slate-400 block">Pending Review</span>
+            <span className="text-xl font-bold font-mono text-amber-400">
+              {stats?.pendingReviews ?? 0}
+            </span>
+          </div>
+          <AlertTriangle className="h-5 w-5 text-amber-500/50" />
+        </div>
+
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+          <div>
+            <span className="text-xs text-slate-400 block">Triaged Findings</span>
+            <span className="text-xl font-bold font-mono text-purple-400">
+              {stats?.triagedReports ?? 0}
+            </span>
+          </div>
+          <Sliders className="h-5 w-5 text-purple-500/50" />
+        </div>
+
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+          <div>
+            <span className="text-xs text-slate-400 block">Accepted & Rewarded</span>
+            <span className="text-xl font-bold font-mono text-cyan-400">
+              {stats?.acceptedReports ?? 0}
+            </span>
+          </div>
+          <Award className="h-5 w-5 text-cyan-500/50" />
+        </div>
+
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+          <div>
+            <span className="text-xs text-slate-400 block">Resolution Rate</span>
+            <span className="text-xl font-bold font-mono text-emerald-400">
+              {stats?.resolutionRate ?? 0}% ({stats?.resolvedReports ?? 0} closed)
+            </span>
+          </div>
+          <CheckCircle2 className="h-5 w-5 text-emerald-500/50" />
+        </div>
       </div>
 
       {/* Interactive Live Backend RBAC Authorization Tester */}
@@ -210,16 +267,6 @@ export const AdminDashboard = () => {
             </pre>
           </div>
         )}
-
-        {!adminCheckResult && !checkError && (
-          <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-xs text-slate-400 flex items-center gap-3">
-            <Lock className="h-4 w-4 text-cyan-400 shrink-0" />
-            <span>
-              Click the button above to execute a real-time HTTP call with your bearer token to test backend
-              role enforcement.
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Triage Queue & Platform Governance Shell */}
@@ -228,20 +275,22 @@ export const AdminDashboard = () => {
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-amber-400" />
-              <span>Incoming Triage Queue</span>
+              <span>Incoming Triage Submissions</span>
             </h4>
-            <span className="text-xs text-cyan-400 font-mono">{triageReports.length} Reports</span>
+            <Link to="/admin/reports" className="text-xs text-cyan-400 hover:underline font-mono">
+              View All Queue &rarr;
+            </Link>
           </div>
 
           {isLoadingData ? (
             <div className="py-6 text-center text-cyan-400">
               <Spinner size="sm" />
             </div>
-          ) : triageReports.length === 0 ? (
+          ) : recentReports.length === 0 ? (
             <p className="text-xs text-slate-500 italic py-4">No reports currently in the triage queue.</p>
           ) : (
             <div className="space-y-2">
-              {triageReports.slice(0, 4).map((r) => (
+              {recentReports.map((r) => (
                 <div
                   key={r._id}
                   className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 hover:border-cyan-500/30 flex items-center justify-between text-xs transition-colors"
@@ -259,7 +308,7 @@ export const AdminDashboard = () => {
                   </div>
                   <Link to={`/reports/${r._id}`}>
                     <Button variant="ghost" size="sm">
-                      Inspect
+                      Triage
                     </Button>
                   </Link>
                 </div>
@@ -272,26 +321,26 @@ export const AdminDashboard = () => {
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
               <Cpu className="h-4 w-4 text-cyan-400" />
-              <span>Platform Security Health</span>
+              <span>Platform Security Health & Services</span>
             </h4>
-            <span className="text-xs text-emerald-400 font-mono">HEALTHY</span>
+            <span className="text-xs text-emerald-400 font-mono">ALL SYSTEMS OPERATIONAL</span>
           </div>
           <ul className="text-xs space-y-2 text-slate-300">
             <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Cloudinary Evidence Uploader</span>
-              <span className="text-emerald-400 font-mono">ACTIVE (Multi-Storage)</span>
+              <span>Reputation Engine</span>
+              <span className="text-cyan-400 font-mono">AUTOMATED (+100/50/25/10 PTS)</span>
             </li>
             <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Database Sanitization (NoSQL)</span>
-              <span className="text-emerald-400 font-mono">ENABLED</span>
+              <span>Vulnerability State Machine</span>
+              <span className="text-emerald-400 font-mono">ENFORCED (Strict 7-step)</span>
             </li>
             <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Auth Rate Limiter</span>
-              <span className="text-emerald-400 font-mono">30 REQ / 15 MIN</span>
+              <span>Internal Admin Notes</span>
+              <span className="text-amber-400 font-mono">PRIVACY SECURED</span>
             </li>
             <li className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-              <span>Bcrypt Salt Workfactor</span>
-              <span className="text-emerald-400 font-mono">12 ROUNDS</span>
+              <span>Researcher Community</span>
+              <span className="text-purple-400 font-mono">{stats?.totalResearchers ?? 0} ACTIVE</span>
             </li>
           </ul>
         </div>

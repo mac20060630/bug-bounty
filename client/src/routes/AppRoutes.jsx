@@ -23,6 +23,8 @@ import SubmitReportPage from '../pages/SubmitReportPage';
 import MyReportsPage from '../pages/MyReportsPage';
 import ReportDetailsPage from '../pages/ReportDetailsPage';
 import AdminProgramsPage from '../pages/AdminProgramsPage';
+import AdminReportsPage from '../pages/AdminReportsPage';
+import LeaderboardPage from '../pages/LeaderboardPage';
 
 // Public Route Guard: If authenticated, redirect away from login/register
 const PublicOnlyRoute = ({ children }) => {
@@ -41,6 +43,7 @@ export const AppRoutes = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="/programs" element={<ProgramsPage />} />
         <Route path="/programs/:id" element={<ProgramDetailsPage />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route
           path="/login"
           element={
@@ -77,6 +80,22 @@ export const AppRoutes = () => {
           element={
             <ProtectedRoute requiredRole="admin">
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports/:id"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <ReportDetailsPage />
             </ProtectedRoute>
           }
         />

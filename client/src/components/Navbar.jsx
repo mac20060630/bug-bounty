@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Shield, Bug, LogOut, User as UserIcon, LayoutDashboard, Terminal } from 'lucide-react';
+import { Shield, Bug, LogOut, User as UserIcon, LayoutDashboard, Terminal, Trophy, ShieldAlert } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import Badge from './common/Badge';
 
@@ -82,18 +82,44 @@ export const Navbar = () => {
                 )}
 
                 {isAdmin && (
-                  <Link
-                    to="/admin/programs"
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                      isActive('/admin/programs')
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                        : 'text-slate-300 hover:text-emerald-400 hover:bg-emerald-950/30'
-                    }`}
-                  >
-                    <Terminal className="h-3.5 w-3.5" />
-                    Manage Programs
-                  </Link>
+                  <>
+                    <Link
+                      to="/admin/reports"
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                        isActive('/admin/reports')
+                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                          : 'text-slate-300 hover:text-amber-400 hover:bg-amber-950/30'
+                      }`}
+                    >
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                      Triage Reports
+                    </Link>
+
+                    <Link
+                      to="/admin/programs"
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                        isActive('/admin/programs')
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          : 'text-slate-300 hover:text-emerald-400 hover:bg-emerald-950/30'
+                      }`}
+                    >
+                      <Terminal className="h-3.5 w-3.5" />
+                      Manage Programs
+                    </Link>
+                  </>
                 )}
+
+                <Link
+                  to="/leaderboard"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    isActive('/leaderboard')
+                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                      : 'text-slate-300 hover:text-amber-400 hover:bg-amber-950/30'
+                  }`}
+                >
+                  <Trophy className="h-3.5 w-3.5" />
+                  Leaderboard
+                </Link>
 
                 <Link
                   to="/profile"
@@ -143,6 +169,19 @@ export const Navbar = () => {
             </>
           ) : (
             <div className="flex items-center gap-3">
+              <Link
+                to="/programs"
+                className="hidden sm:flex items-center gap-1 text-xs text-slate-300 hover:text-white transition-colors"
+              >
+                Programs
+              </Link>
+              <Link
+                to="/leaderboard"
+                className="hidden sm:flex items-center gap-1 text-xs text-slate-300 hover:text-amber-400 transition-colors"
+              >
+                <Trophy className="h-3.5 w-3.5 text-amber-400" />
+                Leaderboard
+              </Link>
               <Link
                 to="/login"
                 className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white transition-colors"

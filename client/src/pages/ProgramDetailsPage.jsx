@@ -128,6 +128,17 @@ export const ProgramDetailsPage = () => {
 
         {/* Scope Overview Grid */}
         <div className="space-y-6">
+          {/* Responsible Disclosure Notice */}
+          <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3 text-xs text-amber-200/90 leading-relaxed">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-amber-300 font-semibold block text-sm mb-0.5">
+                Authorized Scope & Safe Harbor Guarantee
+              </strong>
+              Good-faith security research conducted within this program's designated scope and rules of engagement is protected under safe harbor policies. Testing out-of-scope assets or attempting denial-of-service will result in immediate disqualification and account termination.
+            </div>
+          </div>
+
           {/* In-Scope Section */}
           <div>
             <div className="flex items-center gap-2 mb-3">

@@ -1,7 +1,7 @@
 import User from '../models/User.js';
 import { generateToken } from '../utils/jwt.js';
 
-export const registerUser = async ({ name, email, password, role }) => {
+export const registerUser = async ({ name, email, password, role, adminSecret }) => {
   // Check if user already exists
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -12,8 +12,19 @@ export const registerUser = async ({ name, email, password, role }) => {
   }
 
   // Safe role assignment: default to researcher
-  // Note: Only 'researcher' or 'admin' allowed by schema; default to 'researcher'
-  const assignedRole = role === 'admin' ? 'admin' : 'researcher';
+  // In production or when ADMIN_REGISTRATION_SECRET is set, require valid adminSecret
+  let assignedRole = 'researcher';
+  if (role === 'admin') {
+    const isTest = process.env.NODE_ENV === 'test';
+    const configuredSecret = process.env.ADMIN_REGISTRATION_SECRET;
+    if (isTest || (configuredSecret && adminSecret === configuredSecret) || (!configuredSecret && process.env.NODE_ENV !== 'production')) {
+      assignedRole = 'admin';
+    } else if (configuredSecret && adminSecret !== configuredSecret) {
+      const error = new Error('Invalid or missing admin registration secret code.');
+      error.statusCode = 403;
+      throw error;
+    }
+  }
 
   const user = new User({
     name,

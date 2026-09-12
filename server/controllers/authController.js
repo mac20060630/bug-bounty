@@ -3,8 +3,8 @@ import { sendSuccess, sendError } from '../utils/response.js';
 
 export const register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
-    const result = await authService.registerUser({ name, email, password, role });
+    const { name, email, password, role, adminSecret } = req.body;
+    const result = await authService.registerUser({ name, email, password, role, adminSecret });
     return sendSuccess(res, 201, 'Registration successful', result);
   } catch (error) {
     if (error.statusCode) {

@@ -206,6 +206,17 @@ export const SubmitReportPage = () => {
         </p>
       </div>
 
+      {/* Responsible Disclosure Scope Policy Banner */}
+      <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3 text-xs text-amber-200/90 leading-relaxed shadow-sm">
+        <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+        <div>
+          <strong className="text-amber-300 font-semibold block text-sm mb-0.5">
+            Strict Responsible Disclosure & Scope Notice
+          </strong>
+          Security researchers are authorized to test <strong>ONLY</strong> targets explicitly listed in the active bounty scope. Denial-of-Service (DoS), automated rate-limit abuse, social engineering, and unauthorized access or exfiltration of sensitive data are strictly prohibited.
+        </div>
+      </div>
+
       {formError && (
         <Alert
           type="error"

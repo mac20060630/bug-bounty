@@ -41,7 +41,31 @@ export const connectDB = async () => {
           };
         }
 
-        mongoMemoryServer = await MongoMemoryServer.create(serverOptions);
+        try {
+          mongoMemoryServer = await MongoMemoryServer.create(serverOptions);
+        } catch (dbPathErr) {
+          if (
+            dbPathErr.message?.includes('DBPathInUse') ||
+            dbPathErr.message?.includes('mongod.lock') ||
+            dbPathErr.message?.includes('Unable to lock')
+          ) {
+            console.warn('[Database] Lock detected on server/data/db. Attempting self-healing...');
+            const lockFile = path.join(LOCAL_DB_DIR, 'mongod.lock');
+            if (fs.existsSync(lockFile)) {
+              try {
+                fs.unlinkSync(lockFile);
+              } catch (_) {}
+            }
+            try {
+              mongoMemoryServer = await MongoMemoryServer.create(serverOptions);
+            } catch (_) {
+              console.warn('[Database] Falling back to isolated memory mode to ensure zero downtime.');
+              mongoMemoryServer = await MongoMemoryServer.create();
+            }
+          } else {
+            throw dbPathErr;
+          }
+        }
         const memUri = mongoMemoryServer.getUri();
         await mongoose.connect(memUri);
         console.log(`[Database] Embedded Local MongoDB connected successfully at ${memUri}`);

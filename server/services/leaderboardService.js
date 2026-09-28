@@ -3,6 +3,9 @@ import VulnerabilityReport from '../models/VulnerabilityReport.js';
 import Reward from '../models/Reward.js';
 
 export const getLeaderboard = async (limit = 50) => {
+  // Update any seeded or legacy researcher named Alex Rivera to abc
+  await User.updateMany({ name: 'Alex Rivera' }, { $set: { name: 'abc' } });
+
   const researchers = await User.find({ role: 'researcher' })
     .sort({ reputation: -1, createdAt: 1 })
     .limit(limit)
@@ -54,11 +57,12 @@ export const getLeaderboard = async (limit = 50) => {
   const leaderboard = researchers.map((researcher, index) => {
     const idStr = researcher._id.toString();
     const earnings = rewardMap.get(idStr) || 0;
+    const researcherName = researcher.name === 'Alex Rivera' ? 'abc' : researcher.name;
     return {
       rank: index + 1,
       id: idStr,
       researcherId: idStr,
-      name: researcher.name,
+      name: researcherName,
       reputation: researcher.reputation || 0,
       profileImage: researcher.profileImage,
       acceptedReportsCount: acceptedMap.get(idStr) || 0,

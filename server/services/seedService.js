@@ -4,6 +4,12 @@ import VulnerabilityReport from '../models/VulnerabilityReport.js';
 
 export const seedDefaultDataIfEmpty = async () => {
   try {
+    // Ensure researcher default seed name is updated to abc
+    await User.updateMany(
+      { $or: [{ name: 'Alex Rivera' }, { email: 'researcher@bugbounty.io' }] },
+      { $set: { name: 'abc' } }
+    );
+
     const programCount = await BountyProgram.countDocuments();
     if (programCount > 0) {
       return; // Already seeded or has data
@@ -28,7 +34,7 @@ export const seedDefaultDataIfEmpty = async () => {
     let researcher = await User.findOne({ email: 'researcher@bugbounty.io' });
     if (!researcher) {
       researcher = new User({
-        name: 'Alex Rivera',
+        name: 'abc',
         email: 'researcher@bugbounty.io',
         password: 'ResearcherPassword123!',
         role: 'researcher',

@@ -10,6 +10,7 @@ import {
   Activity,
   Award,
   AlertTriangle,
+  Trophy,
 } from 'lucide-react';
 import Badge from '../components/common/Badge';
 
@@ -22,6 +23,11 @@ export const DashboardLayout = () => {
       label: 'Overview',
       path: isAdmin ? '/admin/dashboard' : '/researcher/dashboard',
       icon: LayoutDashboard,
+    },
+    {
+      label: 'Leaderboard',
+      path: '/leaderboard',
+      icon: Trophy,
     },
     {
       label: 'My Profile',

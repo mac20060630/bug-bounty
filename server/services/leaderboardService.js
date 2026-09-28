@@ -53,15 +53,19 @@ export const getLeaderboard = async (limit = 50) => {
 
   const leaderboard = researchers.map((researcher, index) => {
     const idStr = researcher._id.toString();
+    const earnings = rewardMap.get(idStr) || 0;
     return {
       rank: index + 1,
       id: idStr,
+      researcherId: idStr,
       name: researcher.name,
       reputation: researcher.reputation || 0,
       profileImage: researcher.profileImage,
       acceptedReportsCount: acceptedMap.get(idStr) || 0,
-      totalEarnings: rewardMap.get(idStr) || 0,
+      totalEarnings: earnings,
+      totalRewardsAmount: earnings,
       joinedAt: researcher.createdAt,
+      createdAt: researcher.createdAt,
     };
   });
 
